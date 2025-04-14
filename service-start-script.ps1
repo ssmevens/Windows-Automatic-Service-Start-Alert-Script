@@ -1,5 +1,5 @@
 # Wait for a reasonable amount of time after reboot (e.g., 60 seconds)
-#$Start-Sleep -Seconds 90
+Start-Sleep -Seconds 90
 
 # Get the initial list of services that are set to start automatically (includes both normal and delayed)
 # and are not currently running.
