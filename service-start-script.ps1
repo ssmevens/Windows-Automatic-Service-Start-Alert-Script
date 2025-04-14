@@ -1,5 +1,5 @@
 # Wait for a reasonable amount of time after reboot (e.g., 60 seconds)
-Start-Sleep -Seconds 240
+Start-Sleep -Seconds 90
 
 # Get the initial list of services that are set to start automatically (includes both normal and delayed)
 # and are not currently running.
@@ -112,3 +112,24 @@ $subject = "($hostname) :  Service Start Report"
 # Update the Send-MailMessage command to include -BodyAsHtml parameter
 Send-MailMessage -SmtpServer $smtpServer -From $from -To $to -Subject $subject -Body $emailBody -port $port -Credential $smtpCred -BodyAsHtml
 #write-host $emailBody
+
+# Get the NLA process
+Start-Service -Name NlaSvc
+$nlaProcess = Get-CimInstance Win32_Process | Where-Object { $_.Name -eq "svchost.exe" -and $_.CommandLine -like "*NlaSvc*" } | Select-Object ProcessID
+
+# Print the NLA process
+Write-Host "NLA process ID: $($nlaProcess.ProcessID)"
+
+# Check if the process is running if it is restart the service
+if ($nlaProcess) {
+    Write-Host "Found NLA process with PID: $($nlaProcess.ProcessID)"
+    # Forcefully terminate the process
+    Stop-Process -Id $nlaProcess.ProcessID -Force
+    Write-Host "NLA process has been terminated"
+    Start-Service -Name NlaSvc
+    Write-Host "NLA service has been restarted"
+    $nlaProcessNew = Get-CimInstance Win32_Process | Where-Object { $_.Name -eq "svchost.exe" -and $_.CommandLine -like "*NlaSvc*" } | Select-Object ProcessID
+    Write-Host "NLA New process ID: $($nlaProcessNew.ProcessID)"
+} else {
+    Write-Host "NLA process not found"
+} 
