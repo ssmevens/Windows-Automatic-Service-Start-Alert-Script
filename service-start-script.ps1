@@ -1,5 +1,5 @@
 # Wait for a reasonable amount of time after reboot (e.g., 60 seconds)
-Start-Sleep -Seconds 90
+#$Start-Sleep -Seconds 90
 
 # Get the initial list of services that are set to start automatically (includes both normal and delayed)
 # and are not currently running.
@@ -66,6 +66,31 @@ $finalServices = Get-CimInstance -ClassName Win32_Service | Where-Object {
 
 $finalList = Format-ServiceTableHTML $finalServices
 
+# Get the NLA process
+$nlaBeforeStatus = Get-Service -Name NlaSvc
+$nlaBeforePID = (Get-WmiObject Win32_Service -Filter "Name='NlaSvc'").ProcessId
+
+# Print the NLA process
+Write-Host "NLA process ID: $($nlaBeforePID)"
+
+# Check if the process is running if it is restart the service
+if ($nlaBeforePID) {
+    Write-Host "Found NLA process with PID: $($nlaBeforePID)"
+    # Forcefully terminate the process
+    Stop-Process -Id $nlaBeforePID -Force
+    Write-Host "NLA process has been terminated"
+    start-sleep 30
+    Write-Host "NLA service has been restarted"
+    $nlaAfterPID = (Get-WmiObject Win32_Service -Filter "Name='NlaSvc'").ProcessId
+    Write-Host "NLA New process ID: $($nlaAfterPID)"
+} else {
+    Write-Host "NLA process not found"
+}
+
+# Get final NLA service status
+$nlaAfterStatus = Get-Service -Name NlaSvc
+Write-Host "NLA Service Status: $($nlaAfterStatus.Status)"
+
 # Update email sending to use HTML
 $emailBody = @"
 <html>
@@ -91,6 +116,24 @@ $($errorMessages -join "`n")
         </pre>
     </div>
 
+    <div style='margin-bottom: 30px;'>
+        <h2 style='color: #005DAA; border-left: 4px solid #FFD700; padding-left: 10px;'>Network Location Awareness (NLA) Service Status:</h2>
+        <table style='border-collapse: collapse; width: 100%; font-family: Consolas, monospace; margin-bottom: 20px;'>
+            <tr style='background-color: #005DAA; color: white;'>
+                <th style='text-align: left; padding: 12px; border: 1px solid #003d71;'>Status</th>
+                <th style='text-align: left; padding: 12px; border: 1px solid #003d71;'>Process ID</th>
+            </tr>
+            <tr style='background-color: #f8f9fa;'>
+                <td style='text-align: left; padding: 8px; border: 1px solid #dee2e6;'>Before Restart: $($nlaBeforeStatus.Status)</td>
+                <td style='text-align: left; padding: 8px; border: 1px solid #dee2e6;'>$nlaBeforePID</td>
+            </tr>
+            <tr style='background-color: #ffffff;'>
+                <td style='text-align: left; padding: 8px; border: 1px solid #dee2e6;'>After Restart: $($nlaAfterStatus.Status)</td>
+                <td style='text-align: left; padding: 8px; border: 1px solid #dee2e6;'>$nlaAfterPID</td>
+            </tr>
+        </table>
+    </div>
+
     <div style='border-top: 3px solid #005DAA; padding-top: 20px; margin-top: 30px; font-size: 12px; color: #666;'>
         Generated on $(Get-Date -Format "yyyy-MM-dd HH:mm:ss")
     </div>
@@ -112,24 +155,3 @@ $subject = "($hostname) :  Service Start Report"
 # Update the Send-MailMessage command to include -BodyAsHtml parameter
 Send-MailMessage -SmtpServer $smtpServer -From $from -To $to -Subject $subject -Body $emailBody -port $port -Credential $smtpCred -BodyAsHtml
 #write-host $emailBody
-
-# Get the NLA process
-Start-Service -Name NlaSvc
-$nlaProcess = Get-CimInstance Win32_Process | Where-Object { $_.Name -eq "svchost.exe" -and $_.CommandLine -like "*NlaSvc*" } | Select-Object ProcessID
-
-# Print the NLA process
-Write-Host "NLA process ID: $($nlaProcess.ProcessID)"
-
-# Check if the process is running if it is restart the service
-if ($nlaProcess) {
-    Write-Host "Found NLA process with PID: $($nlaProcess.ProcessID)"
-    # Forcefully terminate the process
-    Stop-Process -Id $nlaProcess.ProcessID -Force
-    Write-Host "NLA process has been terminated"
-    Start-Service -Name NlaSvc
-    Write-Host "NLA service has been restarted"
-    $nlaProcessNew = Get-CimInstance Win32_Process | Where-Object { $_.Name -eq "svchost.exe" -and $_.CommandLine -like "*NlaSvc*" } | Select-Object ProcessID
-    Write-Host "NLA New process ID: $($nlaProcessNew.ProcessID)"
-} else {
-    Write-Host "NLA process not found"
-} 
