@@ -1,5 +1,31 @@
 # Wait for a reasonable amount of time after reboot (e.g., 60 seconds)
-Start-Sleep -Seconds 90
+#Start-Sleep -Seconds 90
+
+
+# Get the NLA process
+$nlaBeforeStatus = Get-Service -Name NlaSvc
+$nlaBeforePID = (Get-WmiObject Win32_Service -Filter "Name='NlaSvc'").ProcessId
+
+# Print the NLA process
+Write-Host "NLA process ID: $($nlaBeforePID)"
+
+# Check if the process is running if it is restart the service
+if ($nlaBeforePID) {
+    Write-Host "Found NLA process with PID: $($nlaBeforePID)"
+    # Forcefully terminate the process
+    Stop-Process -Id $nlaBeforePID -Force
+    Write-Host "NLA process has been terminated"
+    start-sleep 30
+    Write-Host "NLA service has been restarted"
+    $nlaAfterPID = (Get-WmiObject Win32_Service -Filter "Name='NlaSvc'").ProcessId
+    Write-Host "NLA New process ID: $($nlaAfterPID)"
+} else {
+    Write-Host "NLA process not found"
+}
+
+# Get final NLA service status
+$nlaAfterStatus = Get-Service -Name NlaSvc
+Write-Host "NLA Service Status: $($nlaAfterStatus.Status)"
 
 # Get the initial list of services that are set to start automatically (includes both normal and delayed)
 # and are not currently running.
@@ -66,30 +92,6 @@ $finalServices = Get-CimInstance -ClassName Win32_Service | Where-Object {
 
 $finalList = Format-ServiceTableHTML $finalServices
 
-# Get the NLA process
-$nlaBeforeStatus = Get-Service -Name NlaSvc
-$nlaBeforePID = (Get-WmiObject Win32_Service -Filter "Name='NlaSvc'").ProcessId
-
-# Print the NLA process
-Write-Host "NLA process ID: $($nlaBeforePID)"
-
-# Check if the process is running if it is restart the service
-if ($nlaBeforePID) {
-    Write-Host "Found NLA process with PID: $($nlaBeforePID)"
-    # Forcefully terminate the process
-    Stop-Process -Id $nlaBeforePID -Force
-    Write-Host "NLA process has been terminated"
-    start-sleep 30
-    Write-Host "NLA service has been restarted"
-    $nlaAfterPID = (Get-WmiObject Win32_Service -Filter "Name='NlaSvc'").ProcessId
-    Write-Host "NLA New process ID: $($nlaAfterPID)"
-} else {
-    Write-Host "NLA process not found"
-}
-
-# Get final NLA service status
-$nlaAfterStatus = Get-Service -Name NlaSvc
-Write-Host "NLA Service Status: $($nlaAfterStatus.Status)"
 
 # Update email sending to use HTML
 $emailBody = @"
